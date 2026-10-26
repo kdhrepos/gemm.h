@@ -74,16 +74,18 @@ void maskstore(int* C, int8_t mask, __m128i packed_C);
  *          Matrix Pack
  *                                                      
 *********************************************************/
-void spack_blockB(const float* B, float* packed_B, const int NR, 
-                  const int nc, const int NC, const int N, 
+void spack_blockB(const float* B, float* packed_B, 
+                const int NR, const int nc, const int N, 
                   const int kc, const int NTHREADS);
+void spack_panelB(const float* B, float* packed_B, 
+                const int NR, const int nr, 
+                const int N, const int kc);
 void spack_blockA(const float* A, float* packed_A, const int MR,
                   const int mc, const int kc, const int KC, 
                   const int K, const int NTHREADS);
-void spack_panelB(const float* B, float* packed_B, 
-                  const int nr, const int NC, const int N, const int kc);
 void spack_panelA(const float* A, float* packed_A, 
-                  const int mr, const int kc, const int KC, const int K);
+                const int mr, const int MR, 
+                const int kc, const int K);
 
 void dpack_blockB(const double* B, double* packed_B, const int NR, 
                   const int nc, const int NC, const int N, 
