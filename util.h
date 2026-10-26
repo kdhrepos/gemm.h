@@ -32,6 +32,6 @@ typedef short BOOL;
 
 typedef enum { D_ALL, D_FP32, D_FP64, D_INT32, D_INT8, D_INT16 } D_TYPE;
 
-#define DEBUG TRUE
+#define DEBUG FALSE
 
 #endif  // UTIL_H

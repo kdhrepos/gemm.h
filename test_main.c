@@ -65,8 +65,8 @@ static void help() {
   fprintf(stderr, "                         s:  float \n");
   fprintf(stderr, "                         d:  double\n");
   fprintf(stderr, "                         i:  int32 \n");
-  fprintf(stderr, "                         q:  int16 \n");
-  fprintf(stderr, "                         hq: int8  \n");
+  fprintf(stderr, "                         hq: int16 \n");
+  fprintf(stderr, "                         q:  int8  \n");
   fprintf(stderr,
           "                         h:  hfloat "
           "[Unsupported]\n");
@@ -77,7 +77,7 @@ static void help() {
           "  -i, --iter=<num>       Number of iteration for each M, K, N \n");
   fprintf(stderr,
           "  -w, --warmup=<num>     Number of untimed warm-up runs before the "
-          "iterations for each M, K, N Default: 0\n");
+          "iterations for each M, K, N Default: 1\n");
   fprintf(stderr,
           "  -m, --M=<size>         Matrix size M for C(MxN) = A(MxK) X B(KxN) "
           "Default: 1024\n");
@@ -100,6 +100,10 @@ static void help() {
   fprintf(stderr,
           "  -p, --print            Print the GEMM output to console \n");
   fprintf(stderr,
+          "  -C, --csv              Print results as CSV (implies -p), same "
+          "columns as "
+          "reference/openblas_ref \n");
+  fprintf(stderr,
           "  -c, --compare          Also benchmark naive GEMM and report "
           "speedup \n");
 }
@@ -110,6 +114,8 @@ int main(int argc, char* argv[]) {
   int niter = 1, warmup = 1, range = 1, bound = 5;
   BOOL console_flag = FALSE;
   BOOL compare_flag = FALSE;
+  BOOL csv_flag = FALSE;
+  int invalid = 0;
   FILE* file = NULL;
   D_TYPE dtype = D_FP32;
 
@@ -124,10 +130,11 @@ int main(int argc, char* argv[]) {
                                          {"file", required_argument, 0, 'f'},
                                          {"print", no_argument, 0, 'p'},
                                          {"compare", no_argument, 0, 'c'},
+                                         {"csv", no_argument, 0, 'C'},
                                          {"help", no_argument, 0, 'h'},
                                          {0, 0, 0, 0}};
 
-  while ((opt = getopt_long(argc, argv, "t:m:k:n:i:w:r:b:f:pch", long_options,
+  while ((opt = getopt_long(argc, argv, "t:m:k:n:i:w:r:b:f:pcCh", long_options,
                             NULL)) != -1) {
     switch (opt) {
       case 't':
@@ -167,6 +174,10 @@ int main(int argc, char* argv[]) {
       case 'c':
         compare_flag = TRUE;
         break;
+      case 'C':
+        csv_flag = TRUE;
+        console_flag = TRUE;
+        break;
       case 'f':
         if ((file = fopen(optarg, "a")) == NULL) {
           perror("[Error]: File open failed\n");
@@ -189,41 +200,41 @@ int main(int argc, char* argv[]) {
 
   switch (dtype) {
     case D_ALL: {
-      sgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
-                 compare_flag);
-      dgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
-                 compare_flag);
-      igemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
-                 compare_flag);
-      hqgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
-                  compare_flag);
-      qgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
-                 compare_flag);
+      invalid += sgemm_test(M, N, K, niter, warmup, range, bound, file,
+                            console_flag, compare_flag, csv_flag);
+      invalid += dgemm_test(M, N, K, niter, warmup, range, bound, file,
+                            console_flag, compare_flag, csv_flag);
+      invalid += igemm_test(M, N, K, niter, warmup, range, bound, file,
+                            console_flag, compare_flag, csv_flag);
+      invalid += hqgemm_test(M, N, K, niter, warmup, range, bound, file,
+                             console_flag, compare_flag, csv_flag);
+      invalid += qgemm_test(M, N, K, niter, warmup, range, bound, file,
+                            console_flag, compare_flag, csv_flag);
       break;
     }
     case D_FP32: {
-      sgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
-                 compare_flag);
+      invalid += sgemm_test(M, N, K, niter, warmup, range, bound, file,
+                            console_flag, compare_flag, csv_flag);
       break;
     }
     case D_FP64: {
-      dgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
-                 compare_flag);
+      invalid += dgemm_test(M, N, K, niter, warmup, range, bound, file,
+                            console_flag, compare_flag, csv_flag);
       break;
     }
     case D_INT32: {
-      igemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
-                 compare_flag);
+      invalid += igemm_test(M, N, K, niter, warmup, range, bound, file,
+                            console_flag, compare_flag, csv_flag);
       break;
     }
     case D_INT16: {
-      hqgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
-                  compare_flag);
+      invalid += hqgemm_test(M, N, K, niter, warmup, range, bound, file,
+                             console_flag, compare_flag, csv_flag);
       break;
     }
     case D_INT8: {
-      qgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
-                 compare_flag);
+      invalid += qgemm_test(M, N, K, niter, warmup, range, bound, file,
+                            console_flag, compare_flag, csv_flag);
       break;
     }
     default: {
@@ -236,5 +247,11 @@ int main(int argc, char* argv[]) {
   if (file != NULL)
     fclose(file);
 
-  return 0;
+  const int total = ((dtype == D_ALL) ? 5 : 1) * range * range * range;
+  if (invalid == 0)
+    fprintf(stderr, "[Summary] %d/%d GEMM results valid\n", total, total);
+  else
+    fprintf(stderr, "[Summary] %d/%d GEMM results INVALID\n", invalid, total);
+
+  return (invalid == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

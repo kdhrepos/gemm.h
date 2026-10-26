@@ -2,24 +2,25 @@
 #define TEST_H
 
 #include "gemm.h"
+#include "report.h"
 
 #define GEMM_H_TESTER_VERSION "1.0.0"
 
-void sgemm_test(const int M, const int N, const int K, const int niter,
+int sgemm_test(const int M, const int N, const int K, const int niter,
+               const int warmup, const int range, const int bound, FILE* file,
+               BOOL console_flag, BOOL compare_flag, BOOL csv_flag);
+int dgemm_test(const int M, const int N, const int K, const int niter,
+               const int warmup, const int range, const int bound, FILE* file,
+               BOOL console_flag, BOOL compare_flag, BOOL csv_flag);
+int igemm_test(const int M, const int N, const int K, const int niter,
+               const int warmup, const int range, const int bound, FILE* file,
+               BOOL console_flag, BOOL compare_flag, BOOL csv_flag);
+int hqgemm_test(const int M, const int N, const int K, const int niter,
                 const int warmup, const int range, const int bound, FILE* file,
-                BOOL console_flag, BOOL compare_flag);
-void dgemm_test(const int M, const int N, const int K, const int niter,
-                const int warmup, const int range, const int bound, FILE* file,
-                BOOL console_flag, BOOL compare_flag);
-void igemm_test(const int M, const int N, const int K, const int niter,
-                const int warmup, const int range, const int bound, FILE* file,
-                BOOL console_flag, BOOL compare_flag);
-void hqgemm_test(const int M, const int N, const int K, const int niter,
-                 const int warmup, const int range, const int bound, FILE* file,
-                 BOOL console_flag, BOOL compare_flag);
-void qgemm_test(const int M, const int N, const int K, const int niter,
-                const int warmup, const int range, const int bound, FILE* file,
-                BOOL console_flag, BOOL compare_flag);
+                BOOL console_flag, BOOL compare_flag, BOOL csv_flag);
+int qgemm_test(const int M, const int N, const int K, const int niter,
+               const int warmup, const int range, const int bound, FILE* file,
+               BOOL console_flag, BOOL compare_flag, BOOL csv_flag);
 
 uint64_t timer();
 
@@ -50,14 +51,5 @@ void int8_get_rand_mat(int row, int col, int8_t* mat, int bound);
 void fp32_print(int row, int col, float* mat);
 void fp64_print(int row, int col, double* mat);
 void int32_print(int row, int col, int32_t* mat);
-
-void print_console(const int M, const int K, const int N, const int niter,
-                   const double* exec_time, const double* gflops,
-                   const BOOL is_valid_gemm, const BOOL compare_flag,
-                   const double naive_time, const double naive_gflops);
-void print_file(const int M, const int K, const int N, const int niter,
-                const double* exec_time, const double* gflops,
-                const BOOL is_valid_gemm, FILE* file, const BOOL compare_flag,
-                const double naive_time, const double naive_gflops);
 
 #endif  // TEST_H
