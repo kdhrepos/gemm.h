@@ -16,8 +16,6 @@
 #ifndef SSE_H
 #define SSE_H
 
-#pragma once
-
 #include <immintrin.h>
  #if defined(_MSC_VER)
      /* Microsoft C/C++-compatible compiler */

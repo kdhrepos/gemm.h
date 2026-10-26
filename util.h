@@ -11,8 +11,6 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#pragma once
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -34,6 +32,6 @@ typedef short BOOL;
 
 typedef enum {D_ALL, D_FP32, D_FP64, D_INT32, D_INT8, D_INT16} D_TYPE;
 
-#define DEBUG FALSE
+#define DEBUG TRUE
 
 #endif // UTIL_H
