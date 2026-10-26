@@ -83,10 +83,25 @@ void set_block_size(size_t* cache_size, const int NTHREADS,
 }
 
 void cache_opt(const int NTHREADS, const int MR, const int NR,
-               int* MC, int* KC, int* NC, D_TYPE d_type) {
-    size_t cache_size[32];
-    get_cache_size(cache_size);
-    set_block_size(cache_size, NTHREADS, MR, NR, &(*MC), &(*KC), &(*NC), d_type);
+               int* MC, int* KC, int* NC, 
+               D_TYPE d_type) {
+    static size_t cache_size[32];      // CPUID 결과는 프로그램 전체에서 한 번만 읽는다
+    static int cache_ready = 0;
+    if (!cache_ready) {
+        get_cache_size(cache_size);
+        cache_ready = 1;
+    }
+
+    /* default value */
+    *KC = 256;
+    *MC = MR * NTHREADS;
+    *NC = NR * NTHREADS;
+
+    set_block_size(cache_size, NTHREADS, MR, NR, MC, KC, NC, d_type);
+
+    if (*MC < MR * NTHREADS) *MC = MR * NTHREADS;
+    if (*NC < NR * NTHREADS) *NC = NR * NTHREADS;
+
 #if DEBUG
     printf("L1 size: %ld bytes\n", cache_size[1]);
     printf("L2 size: %ld bytes\n", cache_size[2]);
