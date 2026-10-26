@@ -6,20 +6,20 @@
 #define GEMM_H_TESTER_VERSION "1.0.0"
 
 void sgemm_test(const int M, const int N, const int K, const int niter,
-                const int range, const int bound, FILE* file, BOOL console_flag,
-                BOOL compare_flag);
+                const int warmup, const int range, const int bound, FILE* file,
+                BOOL console_flag, BOOL compare_flag);
 void dgemm_test(const int M, const int N, const int K, const int niter,
-                const int range, const int bound, FILE* file, BOOL console_flag,
-                BOOL compare_flag);
+                const int warmup, const int range, const int bound, FILE* file,
+                BOOL console_flag, BOOL compare_flag);
 void igemm_test(const int M, const int N, const int K, const int niter,
-                const int range, const int bound, FILE* file, BOOL console_flag,
-                BOOL compare_flag);
+                const int warmup, const int range, const int bound, FILE* file,
+                BOOL console_flag, BOOL compare_flag);
 void hqgemm_test(const int M, const int N, const int K, const int niter,
-                 const int range, const int bound, FILE* file,
+                 const int warmup, const int range, const int bound, FILE* file,
                  BOOL console_flag, BOOL compare_flag);
 void qgemm_test(const int M, const int N, const int K, const int niter,
-                const int range, const int bound, FILE* file, BOOL console_flag,
-                BOOL compare_flag);
+                const int warmup, const int range, const int bound, FILE* file,
+                BOOL console_flag, BOOL compare_flag);
 
 uint64_t timer();
 

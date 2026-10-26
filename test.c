@@ -1,8 +1,8 @@
 #include "test.h"
 
 void sgemm_test(const int M, const int N, const int K, const int niter,
-                const int range, const int bound, FILE* file, BOOL console_flag,
-                BOOL compare_flag) {
+                const int warmup, const int range, const int bound, FILE* file,
+                BOOL console_flag, BOOL compare_flag) {
   int error_num = 0;
 
   for (int m = M; m < (M + range); m++) {
@@ -17,6 +17,16 @@ void sgemm_test(const int M, const int N, const int K, const int niter,
         float* B = (float*)malloc(k * n * sizeof(float));
         float* C = (float*)malloc(m * n * sizeof(float));
         float* C_ref = (float*)malloc(m * n * sizeof(float));
+
+        /* untimed warm-up runs (page faults, caches, threads) */
+        if (warmup > 0) {
+          fp32_get_rand_mat(m, k, A, bound);
+          fp32_get_rand_mat(k, n, B, bound);
+          for (int w = 0; w < warmup; w++) {
+            memset(C, 0, sizeof(float) * m * n);
+            sgemm(A, B, C, m, n, k);
+          }
+        }
 
         for (int i = 0; i < niter; i++) {
           memset(A, 0, sizeof(float) * m * k);
@@ -86,8 +96,8 @@ void sgemm_test(const int M, const int N, const int K, const int niter,
 }
 
 void dgemm_test(const int M, const int N, const int K, const int niter,
-                const int range, const int bound, FILE* file, BOOL console_flag,
-                BOOL compare_flag) {
+                const int warmup, const int range, const int bound, FILE* file,
+                BOOL console_flag, BOOL compare_flag) {
   int error_num = 0;
 
   for (int m = M; m < (M + range); m++) {
@@ -102,6 +112,16 @@ void dgemm_test(const int M, const int N, const int K, const int niter,
         double* B = (double*)malloc(k * n * sizeof(double));
         double* C = (double*)malloc(m * n * sizeof(double));
         double* C_ref = (double*)malloc(m * n * sizeof(double));
+
+        /* untimed warm-up runs (page faults, caches, threads) */
+        if (warmup > 0) {
+          fp64_get_rand_mat(m, k, A, bound);
+          fp64_get_rand_mat(k, n, B, bound);
+          for (int w = 0; w < warmup; w++) {
+            memset(C, 0, sizeof(double) * m * n);
+            dgemm(A, B, C, m, n, k);
+          }
+        }
 
         for (int i = 0; i < niter; i++) {
           memset(A, 0, sizeof(double) * m * k);
@@ -171,8 +191,8 @@ void dgemm_test(const int M, const int N, const int K, const int niter,
 }
 
 void igemm_test(const int M, const int N, const int K, const int niter,
-                const int range, const int bound, FILE* file, BOOL console_flag,
-                BOOL compare_flag) {
+                const int warmup, const int range, const int bound, FILE* file,
+                BOOL console_flag, BOOL compare_flag) {
   int error_num = 0;
 
   for (int m = M; m < (M + range); m++) {
@@ -187,6 +207,16 @@ void igemm_test(const int M, const int N, const int K, const int niter,
         int* B = (int*)malloc(k * n * sizeof(int));
         int* C = (int*)malloc(m * n * sizeof(int));
         int* C_ref = (int*)malloc(m * n * sizeof(int));
+
+        /* untimed warm-up runs (page faults, caches, threads) */
+        if (warmup > 0) {
+          int32_get_rand_mat(m, k, A, bound);
+          int32_get_rand_mat(k, n, B, bound);
+          for (int w = 0; w < warmup; w++) {
+            memset(C, 0, sizeof(int) * m * n);
+            igemm(A, B, C, m, n, k);
+          }
+        }
 
         for (int i = 0; i < niter; i++) {
           memset(A, 0, sizeof(int) * m * k);
@@ -256,7 +286,7 @@ void igemm_test(const int M, const int N, const int K, const int niter,
 }
 
 void hqgemm_test(const int M, const int N, const int K, const int niter,
-                 const int range, const int bound, FILE* file,
+                 const int warmup, const int range, const int bound, FILE* file,
                  BOOL console_flag, BOOL compare_flag) {
   int error_num = 0;
 
@@ -272,6 +302,16 @@ void hqgemm_test(const int M, const int N, const int K, const int niter,
         int16_t* B = (int16_t*)malloc(k * n * sizeof(int16_t));
         int16_t* C = (int16_t*)malloc(m * n * sizeof(int16_t));
         int16_t* C_ref = (int16_t*)malloc(m * n * sizeof(int16_t));
+
+        /* untimed warm-up runs (page faults, caches, threads) */
+        if (warmup > 0) {
+          int16_get_rand_mat(m, k, A, bound);
+          int16_get_rand_mat(k, n, B, bound);
+          for (int w = 0; w < warmup; w++) {
+            memset(C, 0, sizeof(int16_t) * m * n);
+            hqgemm(A, B, C, m, n, k);
+          }
+        }
 
         for (int i = 0; i < niter; i++) {
           memset(A, 0, sizeof(int16_t) * m * k);
@@ -341,8 +381,8 @@ void hqgemm_test(const int M, const int N, const int K, const int niter,
 }
 
 void qgemm_test(const int M, const int N, const int K, const int niter,
-                const int range, const int bound, FILE* file, BOOL console_flag,
-                BOOL compare_flag) {
+                const int warmup, const int range, const int bound, FILE* file,
+                BOOL console_flag, BOOL compare_flag) {
   int error_num = 0;
 
   for (int m = M; m < (M + range); m++) {
@@ -357,6 +397,16 @@ void qgemm_test(const int M, const int N, const int K, const int niter,
         int8_t* B = (int8_t*)malloc(k * n * sizeof(int8_t));
         int8_t* C = (int8_t*)malloc(m * n * sizeof(int8_t));
         int8_t* C_ref = (int8_t*)malloc(m * n * sizeof(int8_t));
+
+        /* untimed warm-up runs (page faults, caches, threads) */
+        if (warmup > 0) {
+          int8_get_rand_mat(m, k, A, bound);
+          int8_get_rand_mat(k, n, B, bound);
+          for (int w = 0; w < warmup; w++) {
+            memset(C, 0, sizeof(int8_t) * m * n);
+            qgemm(A, B, C, m, n, k);
+          }
+        }
 
         for (int i = 0; i < niter; i++) {
           memset(A, 0, sizeof(int8_t) * m * k);

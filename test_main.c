@@ -76,6 +76,9 @@ static void help() {
   fprintf(stderr,
           "  -i, --iter=<num>       Number of iteration for each M, K, N \n");
   fprintf(stderr,
+          "  -w, --warmup=<num>     Number of untimed warm-up runs before the "
+          "iterations for each M, K, N Default: 0\n");
+  fprintf(stderr,
           "  -m, --M=<size>         Matrix size M for C(MxN) = A(MxK) X B(KxN) "
           "Default: 1024\n");
   fprintf(stderr,
@@ -104,7 +107,7 @@ static void help() {
 int main(int argc, char* argv[]) {
   int opt;
   int M = 1024, N = 1024, K = 1024;
-  int niter = 1, range = 1, bound = 5;
+  int niter = 1, warmup = 1, range = 1, bound = 5;
   BOOL console_flag = FALSE;
   BOOL compare_flag = FALSE;
   FILE* file = NULL;
@@ -115,6 +118,7 @@ int main(int argc, char* argv[]) {
                                          {"K", required_argument, 0, 'k'},
                                          {"N", required_argument, 0, 'n'},
                                          {"iter", required_argument, 0, 'i'},
+                                         {"warmup", required_argument, 0, 'w'},
                                          {"range", required_argument, 0, 'r'},
                                          {"bound", required_argument, 0, 'b'},
                                          {"file", required_argument, 0, 'f'},
@@ -123,7 +127,7 @@ int main(int argc, char* argv[]) {
                                          {"help", no_argument, 0, 'h'},
                                          {0, 0, 0, 0}};
 
-  while ((opt = getopt_long(argc, argv, "t:m:k:n:i:r:b:f:pch", long_options,
+  while ((opt = getopt_long(argc, argv, "t:m:k:n:i:w:r:b:f:pch", long_options,
                             NULL)) != -1) {
     switch (opt) {
       case 't':
@@ -132,6 +136,10 @@ int main(int argc, char* argv[]) {
       case 'i':
         is_valid_integer(optarg, "--iter");
         niter = atoi(optarg);
+        break;
+      case 'w':
+        is_valid_integer(optarg, "--warmup");
+        warmup = atoi(optarg);
         break;
       case 'm':
         is_valid_integer(optarg, "--M");
@@ -181,40 +189,40 @@ int main(int argc, char* argv[]) {
 
   switch (dtype) {
     case D_ALL: {
-      sgemm_test(M, N, K, niter, range, bound, file, console_flag,
+      sgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
                  compare_flag);
-      dgemm_test(M, N, K, niter, range, bound, file, console_flag,
+      dgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
                  compare_flag);
-      igemm_test(M, N, K, niter, range, bound, file, console_flag,
+      igemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
                  compare_flag);
-      hqgemm_test(M, N, K, niter, range, bound, file, console_flag,
+      hqgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
                   compare_flag);
-      qgemm_test(M, N, K, niter, range, bound, file, console_flag,
+      qgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
                  compare_flag);
       break;
     }
     case D_FP32: {
-      sgemm_test(M, N, K, niter, range, bound, file, console_flag,
+      sgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
                  compare_flag);
       break;
     }
     case D_FP64: {
-      dgemm_test(M, N, K, niter, range, bound, file, console_flag,
+      dgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
                  compare_flag);
       break;
     }
     case D_INT32: {
-      igemm_test(M, N, K, niter, range, bound, file, console_flag,
+      igemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
                  compare_flag);
       break;
     }
     case D_INT16: {
-      hqgemm_test(M, N, K, niter, range, bound, file, console_flag,
+      hqgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
                   compare_flag);
       break;
     }
     case D_INT8: {
-      qgemm_test(M, N, K, niter, range, bound, file, console_flag,
+      qgemm_test(M, N, K, niter, warmup, range, bound, file, console_flag,
                  compare_flag);
       break;
     }
