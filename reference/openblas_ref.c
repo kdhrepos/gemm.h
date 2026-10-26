@@ -29,7 +29,6 @@
  *      -i         : measured iterations (default 1)
  *      -w         : warm-up iterations, not measured (default 1)
  *      -b         : random value bound (default 5)
- *      -c         : also report the naive GEMM baseline and speedup
  *      -p         : accepted for compatibility with run (always printed here)
  *      -C, --csv  : print the result as a CSV row
 **********************************************************************************************/
@@ -95,7 +94,7 @@ static void rand_mat(int row, int col, float* mat, int bound) {
   }
 }
 
-/* Same as gemm.h's naive_sgemm: reference result and baseline for speedup. */
+/* Same as gemm.h's naive_sgemm: the reference result for validation. */
 static void naive_sgemm(const float* A, const float* B, float* C, const int M,
                         const int N, const int K) {
   for (int r = 0; r < M; r++) {
@@ -142,14 +141,12 @@ static void help(void) {
   fprintf(
       stderr,
       "  -C, --csv              Print results as CSV, same columns as run\n");
-  fprintf(stderr,
-          "  -c, --compare          Also report naive GEMM and speedup\n");
 }
 
 int main(int argc, char** argv) {
   int M = 1024, N = 1024, K = 1024;
   int niter = 1, warmup = 1, bound = 5;
-  int compare_flag = 0, csv_flag = 0;
+  int csv_flag = 0;
 
   static struct option long_options[] = {{"M", required_argument, 0, 'm'},
                                          {"N", required_argument, 0, 'n'},
@@ -158,13 +155,12 @@ int main(int argc, char** argv) {
                                          {"warmup", required_argument, 0, 'w'},
                                          {"bound", required_argument, 0, 'b'},
                                          {"print", no_argument, 0, 'p'},
-                                         {"compare", no_argument, 0, 'c'},
                                          {"csv", no_argument, 0, 'C'},
                                          {"help", no_argument, 0, 'h'},
                                          {0, 0, 0, 0}};
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "m:n:k:i:w:b:pcCh", long_options,
+  while ((opt = getopt_long(argc, argv, "m:n:k:i:w:b:pCh", long_options,
                             NULL)) != -1) {
     switch (opt) {
       case 'm':
@@ -186,9 +182,6 @@ int main(int argc, char** argv) {
         bound = parse_int(optarg, "--bound");
         break;
       case 'p':
-        break;
-      case 'c':
-        compare_flag = 1;
         break;
       case 'C':
         csv_flag = 1;
@@ -229,7 +222,6 @@ int main(int argc, char** argv) {
                     .N = N,
                     .niter = niter,
                     .warmup = warmup,
-                    .compare = compare_flag,
                     .exec_time = {0, 0, 1e30},
                     .gflops = {0, 0, 1e30}};
 
@@ -259,14 +251,9 @@ int main(int argc, char** argv) {
     if (res.gflops[2] > gflops)
       res.gflops[2] = gflops;
 
-    /* Naive baseline: run once to validate and (optionally) benchmark. */
+    /* Validate the first measured iteration against the naive GEMM. */
     if (it == warmup) {
-      uint64_t nstart = timer_ns();
       naive_sgemm(A, B, C_ref, M, N, K);
-      uint64_t nend = timer_ns();
-      double nelapsed = (nend - nstart) * 1e-9;
-      res.naive_time = nelapsed * 1000;
-      res.naive_gflops = (flop / nelapsed) / 1e9;
 
       res.is_valid = 1;
       for (size_t idx = 0; idx < (size_t)M * N; idx++)

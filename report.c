@@ -45,13 +45,6 @@ static void print_text(FILE* stream, const TestResult* res) {
           res->exec_time[1]);
   fprintf(stream, " GFLOPS   : %9.3f%9.3f%9.3f\n", res->gflops[1], avg_gflops,
           res->gflops[2]);
-
-  if (res->compare) {
-    fprintf(stream,
-            "\n vs Naive : %.3fms (%.3f GFLOPS) -> %.3fx speedup (avg)\n",
-            res->naive_time, res->naive_gflops,
-            (avg_ms > 0) ? (res->naive_time / avg_ms) : 0);
-  }
   fprintf(stream, "════════════════════════════════════════════════\n");
 }
 

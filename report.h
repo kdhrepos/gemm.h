@@ -27,8 +27,6 @@ typedef struct {
   double exec_time[3]; /* sum, worst, best (ms) */
   double gflops[3];    /* sum, best, worst */
   int is_valid;
-  int compare; /* also print the naive GEMM baseline */
-  double naive_time, naive_gflops;
 } TestResult;
 
 /* Print one result as a text block, or as a CSV row (header printed once). */

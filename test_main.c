@@ -103,9 +103,6 @@ static void help() {
           "  -C, --csv              Print results as CSV (implies -p), same "
           "columns as "
           "reference/openblas_ref \n");
-  fprintf(stderr,
-          "  -c, --compare          Also benchmark naive GEMM and report "
-          "speedup \n");
 }
 
 int main(int argc, char* argv[]) {
@@ -113,7 +110,6 @@ int main(int argc, char* argv[]) {
   int M = 1024, N = 1024, K = 1024;
   int niter = 1, warmup = 1, range = 1, bound = 5;
   BOOL console_flag = FALSE;
-  BOOL compare_flag = FALSE;
   BOOL csv_flag = FALSE;
   int invalid = 0;
   FILE* file = NULL;
@@ -129,12 +125,11 @@ int main(int argc, char* argv[]) {
                                          {"bound", required_argument, 0, 'b'},
                                          {"file", required_argument, 0, 'f'},
                                          {"print", no_argument, 0, 'p'},
-                                         {"compare", no_argument, 0, 'c'},
                                          {"csv", no_argument, 0, 'C'},
                                          {"help", no_argument, 0, 'h'},
                                          {0, 0, 0, 0}};
 
-  while ((opt = getopt_long(argc, argv, "t:m:k:n:i:w:r:b:f:pcCh", long_options,
+  while ((opt = getopt_long(argc, argv, "t:m:k:n:i:w:r:b:f:pCh", long_options,
                             NULL)) != -1) {
     switch (opt) {
       case 't':
@@ -171,9 +166,6 @@ int main(int argc, char* argv[]) {
       case 'p':
         console_flag = TRUE;
         break;
-      case 'c':
-        compare_flag = TRUE;
-        break;
       case 'C':
         csv_flag = TRUE;
         console_flag = TRUE;
@@ -201,40 +193,40 @@ int main(int argc, char* argv[]) {
   switch (dtype) {
     case D_ALL: {
       invalid += sgemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, compare_flag, csv_flag);
+                            console_flag, csv_flag);
       invalid += dgemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, compare_flag, csv_flag);
+                            console_flag, csv_flag);
       invalid += igemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, compare_flag, csv_flag);
+                            console_flag, csv_flag);
       invalid += hqgemm_test(M, N, K, niter, warmup, range, bound, file,
-                             console_flag, compare_flag, csv_flag);
+                             console_flag, csv_flag);
       invalid += qgemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, compare_flag, csv_flag);
+                            console_flag, csv_flag);
       break;
     }
     case D_FP32: {
       invalid += sgemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, compare_flag, csv_flag);
+                            console_flag, csv_flag);
       break;
     }
     case D_FP64: {
       invalid += dgemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, compare_flag, csv_flag);
+                            console_flag, csv_flag);
       break;
     }
     case D_INT32: {
       invalid += igemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, compare_flag, csv_flag);
+                            console_flag, csv_flag);
       break;
     }
     case D_INT16: {
       invalid += hqgemm_test(M, N, K, niter, warmup, range, bound, file,
-                             console_flag, compare_flag, csv_flag);
+                             console_flag, csv_flag);
       break;
     }
     case D_INT8: {
       invalid += qgemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, compare_flag, csv_flag);
+                            console_flag, csv_flag);
       break;
     }
     default: {

@@ -34,7 +34,7 @@ static int report(const TestResult* res, FILE* file, BOOL console_flag,
 
 int sgemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL compare_flag, BOOL csv_flag) {
+               BOOL console_flag, BOOL csv_flag) {
   int error_num = 0;
 
   for (int m = M; m < (M + range); m++) {
@@ -49,7 +49,6 @@ int sgemm_test(const int M, const int N, const int K, const int niter,
                           .N = n,
                           .niter = niter,
                           .warmup = warmup,
-                          .compare = compare_flag,
                           .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
                           .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
 
@@ -84,14 +83,9 @@ int sgemm_test(const int M, const int N, const int K, const int niter,
           double elapsed = (end - start) * 1e-9;
           double FLOPS = FLOP / elapsed;
 
-          /* Naive baseline: run once to validate and (optionally) benchmark. */
+          /* Validate the first iteration against the naive GEMM. */
           if (i == 0) {
-            uint64_t nstart = timer();
             naive_sgemm(A, B, C_ref, m, n, k);
-            uint64_t nend = timer();
-            double nelapsed = (nend - nstart) * 1e-9;
-            res.naive_time = nelapsed * 1000;
-            res.naive_gflops = (FLOP / nelapsed) / 1e9;
 
             res.is_valid = TRUE;
             for (int idx = 0; idx < m * n; idx++)
@@ -136,7 +130,7 @@ int sgemm_test(const int M, const int N, const int K, const int niter,
 
 int dgemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL compare_flag, BOOL csv_flag) {
+               BOOL console_flag, BOOL csv_flag) {
   int error_num = 0;
 
   for (int m = M; m < (M + range); m++) {
@@ -151,7 +145,6 @@ int dgemm_test(const int M, const int N, const int K, const int niter,
                           .N = n,
                           .niter = niter,
                           .warmup = warmup,
-                          .compare = compare_flag,
                           .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
                           .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
 
@@ -186,14 +179,9 @@ int dgemm_test(const int M, const int N, const int K, const int niter,
           double elapsed = (end - start) * 1e-9;
           double FLOPS = FLOP / elapsed;
 
-          /* Naive baseline: run once to validate and (optionally) benchmark. */
+          /* Validate the first iteration against the naive GEMM. */
           if (i == 0) {
-            uint64_t nstart = timer();
             naive_dgemm(A, B, C_ref, m, n, k);
-            uint64_t nend = timer();
-            double nelapsed = (nend - nstart) * 1e-9;
-            res.naive_time = nelapsed * 1000;
-            res.naive_gflops = (FLOP / nelapsed) / 1e9;
 
             res.is_valid = TRUE;
             for (int idx = 0; idx < m * n; idx++)
@@ -238,7 +226,7 @@ int dgemm_test(const int M, const int N, const int K, const int niter,
 
 int igemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL compare_flag, BOOL csv_flag) {
+               BOOL console_flag, BOOL csv_flag) {
   int error_num = 0;
 
   for (int m = M; m < (M + range); m++) {
@@ -253,7 +241,6 @@ int igemm_test(const int M, const int N, const int K, const int niter,
                           .N = n,
                           .niter = niter,
                           .warmup = warmup,
-                          .compare = compare_flag,
                           .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
                           .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
 
@@ -288,14 +275,9 @@ int igemm_test(const int M, const int N, const int K, const int niter,
           double elapsed = (end - start) * 1e-9;
           double FLOPS = FLOP / elapsed;
 
-          /* Naive baseline: run once to validate and (optionally) benchmark. */
+          /* Validate the first iteration against the naive GEMM. */
           if (i == 0) {
-            uint64_t nstart = timer();
             naive_igemm(A, B, C_ref, m, n, k);
-            uint64_t nend = timer();
-            double nelapsed = (nend - nstart) * 1e-9;
-            res.naive_time = nelapsed * 1000;
-            res.naive_gflops = (FLOP / nelapsed) / 1e9;
 
             res.is_valid = TRUE;
             for (int idx = 0; idx < m * n; idx++)
@@ -340,7 +322,7 @@ int igemm_test(const int M, const int N, const int K, const int niter,
 
 int hqgemm_test(const int M, const int N, const int K, const int niter,
                 const int warmup, const int range, const int bound, FILE* file,
-                BOOL console_flag, BOOL compare_flag, BOOL csv_flag) {
+                BOOL console_flag, BOOL csv_flag) {
   int error_num = 0;
 
   for (int m = M; m < (M + range); m++) {
@@ -355,7 +337,6 @@ int hqgemm_test(const int M, const int N, const int K, const int niter,
                           .N = n,
                           .niter = niter,
                           .warmup = warmup,
-                          .compare = compare_flag,
                           .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
                           .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
 
@@ -390,14 +371,9 @@ int hqgemm_test(const int M, const int N, const int K, const int niter,
           double elapsed = (end - start) * 1e-9;
           double FLOPS = FLOP / elapsed;
 
-          /* Naive baseline: run once to validate and (optionally) benchmark. */
+          /* Validate the first iteration against the naive GEMM. */
           if (i == 0) {
-            uint64_t nstart = timer();
             naive_hqgemm(A, B, C_ref, m, n, k);
-            uint64_t nend = timer();
-            double nelapsed = (nend - nstart) * 1e-9;
-            res.naive_time = nelapsed * 1000;
-            res.naive_gflops = (FLOP / nelapsed) / 1e9;
 
             res.is_valid = TRUE;
             for (int idx = 0; idx < m * n; idx++)
@@ -442,7 +418,7 @@ int hqgemm_test(const int M, const int N, const int K, const int niter,
 
 int qgemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL compare_flag, BOOL csv_flag) {
+               BOOL console_flag, BOOL csv_flag) {
   int error_num = 0;
 
   for (int m = M; m < (M + range); m++) {
@@ -457,7 +433,6 @@ int qgemm_test(const int M, const int N, const int K, const int niter,
                           .N = n,
                           .niter = niter,
                           .warmup = warmup,
-                          .compare = compare_flag,
                           .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
                           .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
 
@@ -492,14 +467,9 @@ int qgemm_test(const int M, const int N, const int K, const int niter,
           double elapsed = (end - start) * 1e-9;
           double FLOPS = FLOP / elapsed;
 
-          /* Naive baseline: run once to validate and (optionally) benchmark. */
+          /* Validate the first iteration against the naive GEMM. */
           if (i == 0) {
-            uint64_t nstart = timer();
             naive_qgemm(A, B, C_ref, m, n, k);
-            uint64_t nend = timer();
-            double nelapsed = (nend - nstart) * 1e-9;
-            res.naive_time = nelapsed * 1000;
-            res.naive_gflops = (FLOP / nelapsed) / 1e9;
 
             res.is_valid = TRUE;
             for (int idx = 0; idx < m * n; idx++)

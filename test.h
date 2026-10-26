@@ -8,24 +8,24 @@
 
 int sgemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL compare_flag, BOOL csv_flag);
+               BOOL console_flag, BOOL csv_flag);
 int dgemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL compare_flag, BOOL csv_flag);
+               BOOL console_flag, BOOL csv_flag);
 int igemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL compare_flag, BOOL csv_flag);
+               BOOL console_flag, BOOL csv_flag);
 int hqgemm_test(const int M, const int N, const int K, const int niter,
                 const int warmup, const int range, const int bound, FILE* file,
-                BOOL console_flag, BOOL compare_flag, BOOL csv_flag);
+                BOOL console_flag, BOOL csv_flag);
 int qgemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL compare_flag, BOOL csv_flag);
+               BOOL console_flag, BOOL csv_flag);
 
 uint64_t timer();
 
-/* Naive GEMM writes its reference result into C, used both as a
-   correctness reference and as a baseline for performance comparison. */
+/* Naive GEMM writes its reference result into C, used as the
+   correctness reference. */
 void naive_sgemm(const float* A, const float* B, float* C, const int M,
                  const int N, const int K);
 void naive_dgemm(const double* A, const double* B, double* C, const int M,
