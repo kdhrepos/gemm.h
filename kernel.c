@@ -18,10 +18,12 @@
 **********************************************************************************************/
 
 #include "gemm.h"
+#include "ops.h"
 
 void skernel(const float* packed_blockA, const float* packed_blockB, float* C,
-              const int m, const int kc, const int KC, 
-              const int n, const int NC, const int N) {
+              const int m, const int MR,
+              const int kc, const int KC, 
+              const int n, const int NR, const int N) {
 #if INSTLEVEL >= 8 /* AVX512F */ /* 14x32 kernel */
     __m512 packed_C[14][2]; /* 14x32 */
     __m512 a_blockA, b0_blockB, b1_blockB;
@@ -36,64 +38,64 @@ void skernel(const float* packed_blockA, const float* packed_blockB, float* C,
         b0_blockB = _mm512_load_ps(packed_blockB + 0);
         b1_blockB = _mm512_load_ps(packed_blockB + 16);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 0]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[0]); 
         packed_C[0][0] = sfma(a_blockA, b0_blockB, packed_C[0][0]);
         packed_C[0][1] = sfma(a_blockA, b1_blockB, packed_C[0][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 1]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[1]); 
         packed_C[1][0] = sfma(a_blockA, b0_blockB, packed_C[1][0]);
         packed_C[1][1] = sfma(a_blockA, b1_blockB, packed_C[1][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 2]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[2]); 
         packed_C[2][0] = sfma(a_blockA, b0_blockB, packed_C[2][0]);
         packed_C[2][1] = sfma(a_blockA, b1_blockB, packed_C[2][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 3]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[3]); 
         packed_C[3][0] = sfma(a_blockA, b0_blockB, packed_C[3][0]);
         packed_C[3][1] = sfma(a_blockA, b1_blockB, packed_C[3][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 4]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[4]); 
         packed_C[4][0] = sfma(a_blockA, b0_blockB, packed_C[4][0]);
         packed_C[4][1] = sfma(a_blockA, b1_blockB, packed_C[4][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 5]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[5]); 
         packed_C[5][0] = sfma(a_blockA, b0_blockB, packed_C[5][0]);
         packed_C[5][1] = sfma(a_blockA, b1_blockB, packed_C[5][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 6]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[6]); 
         packed_C[6][0] = sfma(a_blockA, b0_blockB, packed_C[6][0]);
         packed_C[6][1] = sfma(a_blockA, b1_blockB, packed_C[6][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 7]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[7]); 
         packed_C[7][0] = sfma(a_blockA, b0_blockB, packed_C[7][0]);
         packed_C[7][1] = sfma(a_blockA, b1_blockB, packed_C[7][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 8]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[8]); 
         packed_C[8][0] = sfma(a_blockA, b0_blockB, packed_C[8][0]);
         packed_C[8][1] = sfma(a_blockA, b1_blockB, packed_C[8][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 9]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[9]); 
         packed_C[9][0] = sfma(a_blockA, b0_blockB, packed_C[9][0]);
         packed_C[9][1] = sfma(a_blockA, b1_blockB, packed_C[9][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 10]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[10]); 
         packed_C[10][0] = sfma(a_blockA, b0_blockB, packed_C[10][0]);
         packed_C[10][1] = sfma(a_blockA, b1_blockB, packed_C[10][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 11]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[11]); 
         packed_C[11][0] = sfma(a_blockA, b0_blockB, packed_C[11][0]);
         packed_C[11][1] = sfma(a_blockA, b1_blockB, packed_C[11][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 12]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[12]); 
         packed_C[12][0] = sfma(a_blockA, b0_blockB, packed_C[12][0]);
         packed_C[12][1] = sfma(a_blockA, b1_blockB, packed_C[12][1]);
 
-        a_blockA = _mm512_set1_ps(packed_blockA[KC * 13]); 
+        a_blockA = _mm512_set1_ps(packed_blockA[13]); 
         packed_C[13][0] = sfma(a_blockA, b0_blockB, packed_C[13][0]);
         packed_C[13][1] = sfma(a_blockA, b1_blockB, packed_C[13][1]);
 
-        packed_blockA += 1; /* next column */
-        packed_blockB += NC; /* next 32 elements*/
+        packed_blockA += MR; /* next column */
+        packed_blockB += NR; /* next 32 elements*/
     }
     for(int r = 0; r < m; r++) {
         _mm512_mask_storeu_ps(&C[r * N + 0], packed_mask_0, packed_C[r][0]);

@@ -12,8 +12,6 @@
 #ifndef GEMM_H
 #define GEMM_H 1
 
-#pragma once 
-
 #include "util.h"
 #include "sse.h"
 
@@ -41,8 +39,9 @@ void qgemm(const int8_t* A, const int8_t* B, int8_t* C,
  *                                                      
 *********************************************************/
 void skernel(const float* packed_blockA, const float* packed_blockB, float* C,
-              const int m, const int kc, const int KC, 
-              const int n, const int NC, const int N);
+              const int m, const int MR,
+              const int kc, const int KC, 
+              const int n, const int NR, const int N);
 void dkernel(const double* packed_blockA, const double* packed_blockB, double* C,
               const int m, const int kc, const int KC, 
               const int n, const int NC, const int N);
@@ -76,13 +75,13 @@ void maskstore(int* C, int8_t mask, __m128i packed_C);
 *********************************************************/
 void spack_blockB(const float* B, float* packed_B, 
                 const int NR, const int nc, const int N, 
-                  const int kc, const int NTHREADS);
+                const int kc, const int NTHREADS);
 void spack_panelB(const float* B, float* packed_B, 
                 const int NR, const int nr, 
                 const int N, const int kc);
 void spack_blockA(const float* A, float* packed_A, const int MR,
-                  const int mc, const int kc, const int KC, 
-                  const int K, const int NTHREADS);
+                const int mc, const int kc, const int KC, 
+                const int K, const int NTHREADS);
 void spack_panelA(const float* A, float* packed_A, 
                 const int mr, const int MR, 
                 const int kc, const int K);
