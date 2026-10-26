@@ -83,6 +83,7 @@ static void help() {
     fprintf(stderr, "  -b, --bound=<num>      Bound for generating random matrix value \n");
     fprintf(stderr, "  -f, --file=<filename>  Print the GEMM output to <filename>\n");
     fprintf(stderr, "  -p, --print            Print the GEMM output to console \n");
+    fprintf(stderr, "  -c, --compare          Also benchmark naive GEMM and report speedup \n");
 }
 
 int main(int argc, char* argv[]) {
@@ -90,6 +91,7 @@ int main(int argc, char* argv[]) {
     int M = 1024, N = 1024 , K = 1024;
     int niter = 1, range = 1, bound = 5;
     BOOL console_flag = FALSE;
+    BOOL compare_flag = FALSE;
     FILE* file = NULL;
     D_TYPE dtype = D_FP32;
 
@@ -103,11 +105,12 @@ int main(int argc, char* argv[]) {
         {"bound",   required_argument, 0, 'b'},
         {"file",    required_argument, 0, 'f'},
         {"print",   no_argument,       0, 'p'},
+        {"compare", no_argument,       0, 'c'},
         {"help",    no_argument,       0, 'h'},
-        {0, 0, 0, 0}                     
+        {0, 0, 0, 0}
     };
 
-    while((opt = getopt_long(argc, argv, "t:m:k:n:i:r:b:f:p:h", long_options, NULL)) != -1) {
+    while((opt = getopt_long(argc, argv, "t:m:k:n:i:r:b:f:pch", long_options, NULL)) != -1) {
         switch (opt) {
             case 't':
                 dtype = parse_dtype(optarg);
@@ -139,6 +142,9 @@ int main(int argc, char* argv[]) {
             case 'p':
                 console_flag = TRUE;
                 break;
+            case 'c':
+                compare_flag = TRUE;
+                break;
             case 'f':
                 if((file = fopen(optarg, "a")) == NULL) {
                     perror("[Error]: File open failed\n");
@@ -161,30 +167,31 @@ int main(int argc, char* argv[]) {
 
     switch(dtype) {
         case D_ALL: {
-            sgemm_test(M, N, K, niter, range, bound, file, console_flag);
-            dgemm_test(M, N, K, niter, range, bound, file, console_flag);
-            igemm_test(M, N, K, niter, range, bound, file, console_flag);
-            qgemm_test(M, N, K, niter, range, bound, file, console_flag);
+            sgemm_test(M, N, K, niter, range, bound, file, console_flag, compare_flag);
+            dgemm_test(M, N, K, niter, range, bound, file, console_flag, compare_flag);
+            igemm_test(M, N, K, niter, range, bound, file, console_flag, compare_flag);
+            hqgemm_test(M, N, K, niter, range, bound, file, console_flag, compare_flag);
+            qgemm_test(M, N, K, niter, range, bound, file, console_flag, compare_flag);
             break;
         }
         case D_FP32: {
-            sgemm_test(M, N, K, niter, range, bound, file, console_flag);
+            sgemm_test(M, N, K, niter, range, bound, file, console_flag, compare_flag);
             break;
         }
         case D_FP64: {
-            dgemm_test(M, N, K, niter, range, bound, file, console_flag);
+            dgemm_test(M, N, K, niter, range, bound, file, console_flag, compare_flag);
             break;
         }
         case D_INT32: {
-            igemm_test(M, N, K, niter, range, bound, file, console_flag);
+            igemm_test(M, N, K, niter, range, bound, file, console_flag, compare_flag);
             break;
         }
         case D_INT16: {
-            hqgemm_test(M, N, K, niter, range, bound, file, console_flag);
+            hqgemm_test(M, N, K, niter, range, bound, file, console_flag, compare_flag);
             break;
         }
         case D_INT8: {
-            qgemm_test(M, N, K, niter, range, bound, file, console_flag);
+            qgemm_test(M, N, K, niter, range, bound, file, console_flag, compare_flag);
             break;
         }
         default: {
