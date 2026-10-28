@@ -56,7 +56,7 @@ void qkernel(const int8_t* packed_blockA, const int8_t* packed_blockB,
 
 /********************************************************
  *                                                      
- *          Memory operation
+ *          Memory Operation
  *                                                      
 *********************************************************/
 #if INSTLEVEL >= 9   /* AVX512BW */

@@ -61,7 +61,7 @@ void sgemm(const float* A, const float* B, float* C, const int M, const int N,
         const int mc = min(MC, M - Am_row);
         spack_blockA(&A[(Am_row * K) + k], packed_A, MR, mc, kc, KC, K,
                      NTHREADS);
-#pragma omp parallel for num_threads(NTHREADS) schedule(static)
+#pragma omp parallel for collapse(2) num_threads(NTHREADS) schedule(static)
         for (int Bb_col = 0; Bb_col < nc; Bb_col += NR) {   /* 2nd loop */
           for (int Ab_row = 0; Ab_row < mc; Ab_row += MR) { /* 1st loop */
             const int nr = min(NR, nc - Bb_col);
@@ -101,7 +101,7 @@ void dgemm(const double* A, const double* B, double* C, const int M,
         const int mc = min(MC, M - Am_row);
         dpack_blockA(&A[(Am_row * K) + k], packed_A, MR, mc, kc, KC, K,
                      NTHREADS);
-#pragma omp parallel for num_threads(NTHREADS) schedule(static)
+#pragma omp parallel for collapse(2) num_threads(NTHREADS) schedule(static)
         for (int Bb_col = 0; Bb_col < nc; Bb_col += NR) {   /* 2nd loop */
           for (int Ab_row = 0; Ab_row < mc; Ab_row += MR) { /* 1st loop */
             const int nr = min(NR, nc - Bb_col);
@@ -141,7 +141,7 @@ void igemm(const int* A, const int* B, int* C, const int M, const int N,
         const int mc = min(MC, M - Am_row);
         ipack_blockA(&A[(Am_row * K) + k], packed_A, MR, mc, kc, KC, K,
                      NTHREADS);
-#pragma omp parallel for num_threads(NTHREADS) schedule(static)
+#pragma omp parallel for collapse(2) num_threads(NTHREADS) schedule(static)
         for (int Bb_col = 0; Bb_col < nc; Bb_col += NR) {   /* 2nd loop */
           for (int Ab_row = 0; Ab_row < mc; Ab_row += MR) { /* 1st loop */
             const int nr = min(NR, nc - Bb_col);
@@ -183,7 +183,7 @@ void hqgemm(const int16_t* A, const int16_t* B, int16_t* C, const int M,
         const int mc = min(MC, M - Am_row);
         hqpack_blockA(&A[(Am_row * K) + k], packed_A, MR, mc, kc, KC, K,
                       NTHREADS);
-#pragma omp parallel for num_threads(NTHREADS) schedule(static)
+#pragma omp parallel for collapse(2) num_threads(NTHREADS) schedule(static)
         for (int Bb_col = 0; Bb_col < nc; Bb_col += NR) {   /* 2nd loop */
           for (int Ab_row = 0; Ab_row < mc; Ab_row += MR) { /* 1st loop */
             const int nr = min(NR, nc - Bb_col);
@@ -225,7 +225,7 @@ void qgemm(const int8_t* A, const int8_t* B, int8_t* C, const int M,
         const int mc = min(MC, M - Am_row);
         qpack_blockA(&A[(Am_row * K) + k], packed_A, MR, mc, kc, KC, K,
                      NTHREADS);
-#pragma omp parallel for num_threads(NTHREADS) schedule(static)
+#pragma omp parallel for collapse(2) num_threads(NTHREADS) schedule(static)
         for (int Bb_col = 0; Bb_col < nc; Bb_col += NR) {   /* 2nd loop */
           for (int Ab_row = 0; Ab_row < mc; Ab_row += MR) { /* 1st loop */
             const int nr = min(NR, nc - Bb_col);
