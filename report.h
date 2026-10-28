@@ -26,6 +26,7 @@ typedef struct {
   int niter, warmup;
   double exec_time[3]; /* sum, worst, best (ms) */
   double gflops[3];    /* sum, best, worst */
+  int verify; /* checked against the naive GEMM; is_valid means nothing if 0 */
   int is_valid;
 } TestResult;
 

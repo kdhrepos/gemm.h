@@ -38,7 +38,9 @@ static void print_text(FILE* stream, const TestResult* res) {
           res->threads, res->warmup, res->niter, res->isa);
   fprintf(stream, "────────────────────────────────────────────────\n");
   fprintf(stream, " Result   : %s\n\n",
-          res->is_valid ? "[Valid GEMM]" : "[Invalid GEMM!]");
+          !res->verify    ? "[Not verified]"
+          : res->is_valid ? "[Valid GEMM]"
+                          : "[Invalid GEMM!]");
 
   fprintf(stream, "%12s%9s%9s%9s\n", "", "best", "avg", "worst");
   fprintf(stream, " Time(ms) : %9.3f%9.3f%9.3f\n", res->exec_time[2], avg_ms,

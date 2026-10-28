@@ -103,6 +103,9 @@ static void help() {
           "  -C, --csv              Print results as CSV (implies -p), same "
           "columns as "
           "reference/openblas_ref \n");
+  fprintf(stderr,
+          "  -v, --verify           Check the result against the naive GEMM "
+          "after the timed runs (slow for large sizes) \n");
 }
 
 int main(int argc, char* argv[]) {
@@ -111,6 +114,7 @@ int main(int argc, char* argv[]) {
   int niter = 1, warmup = 1, range = 1, bound = 5;
   BOOL console_flag = FALSE;
   BOOL csv_flag = FALSE;
+  BOOL verify_flag = FALSE;
   int invalid = 0;
   FILE* file = NULL;
   D_TYPE dtype = D_FP32;
@@ -126,10 +130,11 @@ int main(int argc, char* argv[]) {
                                          {"file", required_argument, 0, 'f'},
                                          {"print", no_argument, 0, 'p'},
                                          {"csv", no_argument, 0, 'C'},
+                                         {"verify", no_argument, 0, 'v'},
                                          {"help", no_argument, 0, 'h'},
                                          {0, 0, 0, 0}};
 
-  while ((opt = getopt_long(argc, argv, "t:m:k:n:i:w:r:b:f:pCh", long_options,
+  while ((opt = getopt_long(argc, argv, "t:m:k:n:i:w:r:b:f:pCvh", long_options,
                             NULL)) != -1) {
     switch (opt) {
       case 't':
@@ -170,6 +175,9 @@ int main(int argc, char* argv[]) {
         csv_flag = TRUE;
         console_flag = TRUE;
         break;
+      case 'v':
+        verify_flag = TRUE;
+        break;
       case 'f':
         if ((file = fopen(optarg, "a")) == NULL) {
           perror("[Error]: File open failed\n");
@@ -193,40 +201,40 @@ int main(int argc, char* argv[]) {
   switch (dtype) {
     case D_ALL: {
       invalid += sgemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, csv_flag);
+                            console_flag, csv_flag, verify_flag);
       invalid += dgemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, csv_flag);
+                            console_flag, csv_flag, verify_flag);
       invalid += igemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, csv_flag);
+                            console_flag, csv_flag, verify_flag);
       invalid += hqgemm_test(M, N, K, niter, warmup, range, bound, file,
-                             console_flag, csv_flag);
+                             console_flag, csv_flag, verify_flag);
       invalid += qgemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, csv_flag);
+                            console_flag, csv_flag, verify_flag);
       break;
     }
     case D_FP32: {
       invalid += sgemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, csv_flag);
+                            console_flag, csv_flag, verify_flag);
       break;
     }
     case D_FP64: {
       invalid += dgemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, csv_flag);
+                            console_flag, csv_flag, verify_flag);
       break;
     }
     case D_INT32: {
       invalid += igemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, csv_flag);
+                            console_flag, csv_flag, verify_flag);
       break;
     }
     case D_INT16: {
       invalid += hqgemm_test(M, N, K, niter, warmup, range, bound, file,
-                             console_flag, csv_flag);
+                             console_flag, csv_flag, verify_flag);
       break;
     }
     case D_INT8: {
       invalid += qgemm_test(M, N, K, niter, warmup, range, bound, file,
-                            console_flag, csv_flag);
+                            console_flag, csv_flag, verify_flag);
       break;
     }
     default: {
@@ -239,11 +247,13 @@ int main(int argc, char* argv[]) {
   if (file != NULL)
     fclose(file);
 
-  const int total = ((dtype == D_ALL) ? 5 : 1) * range * range * range;
-  if (invalid == 0)
-    fprintf(stderr, "[Summary] %d/%d GEMM results valid\n", total, total);
-  else
-    fprintf(stderr, "[Summary] %d/%d GEMM results INVALID\n", invalid, total);
+  if (verify_flag) {
+    const int total = ((dtype == D_ALL) ? 5 : 1) * range * range * range;
+    if (invalid == 0)
+      fprintf(stderr, "[Summary] %d/%d GEMM results valid\n", total, total);
+    else
+      fprintf(stderr, "[Summary] %d/%d GEMM results INVALID\n", invalid, total);
+  }
 
   return (invalid == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
