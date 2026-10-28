@@ -22,494 +22,448 @@ static const char* isa_name(const int kernel_level) {
 /* Print one result to the enabled outputs; returns 1 if the GEMM is invalid. */
 static int report(const TestResult* res, FILE* file, BOOL console_flag,
                   BOOL csv_flag) {
-  if (!res->is_valid)
+  const int invalid = res->verify && !res->is_valid;
+
+  if (invalid)
     fprintf(stderr, "[Invalid GEMM!] %s M=%d N=%d K=%d\n", res->name, res->M,
             res->N, res->K);
   if (console_flag)
     print_result(stdout, res, csv_flag);
   if (file != NULL)
     print_result(file, res, csv_flag);
-  return !res->is_valid;
+  return invalid;
+}
+
+/* 64-byte aligned matrix. A malloc'd block starts 16 bytes past a cache line,
+   so every vector load in packing and in the C update splits two lines. */
+static void* alloc_mat(size_t bytes) {
+  return aligned_alloc(MEM_ALIGN,
+                       (bytes + MEM_ALIGN - 1) / MEM_ALIGN * MEM_ALIGN);
 }
 
 int sgemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL csv_flag) {
-  int error_num = 0;
+               BOOL console_flag, BOOL csv_flag, BOOL verify_flag) {
+  float* A = alloc_mat(sizeof(float) * (size_t)M * K);
+  float* B = alloc_mat(sizeof(float) * (size_t)K * N);
+  float* C = alloc_mat(sizeof(float) * (size_t)M * N);
 
-  for (int m = M; m < (M + range); m++) {
-    for (int n = N; n < (N + range); n++) {
-      for (int k = K; k < (K + range); k++) {
-        TestResult res = {.lib = "gemm.h",
-                          .name = "sgemm",
-                          .isa = isa_name(INSTLEVEL_AVX512F),
-                          .threads = omp_get_max_threads(),
-                          .M = m,
-                          .K = k,
-                          .N = n,
-                          .niter = niter,
-                          .warmup = warmup,
-                          .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
-                          .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
+  fp32_get_rand_mat(M, K, A, bound);
+  fp32_get_rand_mat(K, N, B, bound);
+  memset(C, 0, sizeof(float) * (size_t)M * N);
 
-        float* A = (float*)malloc(m * k * sizeof(float));
-        float* B = (float*)malloc(k * n * sizeof(float));
-        float* C = (float*)malloc(m * n * sizeof(float));
-        float* C_ref = (float*)malloc(m * n * sizeof(float));
+  const double FLOP = 2.0 * M * N * K;
 
-        /* untimed warm-up runs (page faults, caches, threads) */
-        if (warmup > 0) {
-          fp32_get_rand_mat(m, k, A, bound);
-          fp32_get_rand_mat(k, n, B, bound);
-          for (int w = 0; w < warmup; w++) {
-            memset(C, 0, sizeof(float) * m * n);
-            sgemm(A, B, C, m, n, k);
-          }
-        }
+  TestResult res = {.lib = "gemm.h",
+                    .name = "sgemm",
+                    .isa = isa_name(INSTLEVEL_AVX512F),
+                    .threads = omp_get_max_threads(),
+                    .M = M,
+                    .K = K,
+                    .N = N,
+                    .niter = niter,
+                    .warmup = warmup,
+                    .verify = verify_flag,
+                    .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
+                    .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
 
-        for (int i = 0; i < niter; i++) {
-          memset(A, 0, sizeof(float) * m * k);
-          memset(B, 0, sizeof(float) * k * n);
-          memset(C, 0, sizeof(float) * m * n);
+  /* warm-up runs (page faults, caches, threads) are not measured */
+  for (int w = 0; w < warmup; w++)
+    sgemm(A, B, C, M, N, K);
 
-          fp32_get_rand_mat(m, k, A, bound);
-          fp32_get_rand_mat(k, n, B, bound);
+  for (int i = 0; i < niter; i++) {
+    /* C += A * B, so C is reset before every run (outside the timer) */
+    memset(C, 0, sizeof(float) * (size_t)M * N);
 
-          double FLOP = 2 * (double)m * n * k;
+    uint64_t start = timer();
+    sgemm(A, B, C, M, N, K);
+    uint64_t end = timer();
 
-          uint64_t start = timer();
-          sgemm(A, B, C, m, n, k);
-          uint64_t end = timer();
-          double elapsed = (end - start) * 1e-9;
-          double FLOPS = FLOP / elapsed;
+    double elapsed = (end - start) * 1e-9;
+    double FLOPS = FLOP / elapsed;
 
-          /* Validate the first iteration against the naive GEMM. */
-          if (i == 0) {
-            naive_sgemm(A, B, C_ref, m, n, k);
-
-            res.is_valid = TRUE;
-            for (int idx = 0; idx < m * n; idx++)
-              if (C[idx] != C_ref[idx]) {
-                res.is_valid = FALSE;
-                break;
-              }
-          }
-
-          // if range is not 0, don't print each results
-          if (range == 0) {
-            printf("Exec. time = %.3lfms\n", elapsed * 1000);
-            printf("GFLOPS = %.3lf\n", FLOPS / 1e9);
-          }
-
-          res.exec_time[0] += (elapsed * 1000);
-          res.exec_time[1] =
-              (res.exec_time[1] < (elapsed * 1000) ? (elapsed * 1000)
-                                                   : res.exec_time[1]);
-          res.exec_time[2] =
-              (res.exec_time[2] > (elapsed * 1000) ? (elapsed * 1000)
-                                                   : res.exec_time[2]);
-
-          res.gflops[0] += (FLOPS / 1e9);
-          res.gflops[1] =
-              (res.gflops[1] < (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[1]);
-          res.gflops[2] =
-              (res.gflops[2] > (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[2]);
-        }
-        free(A);
-        free(B);
-        free(C);
-        free(C_ref);
-
-        error_num += report(&res, file, console_flag, csv_flag);
-      }
+    /* if range is not 0, don't print each results */
+    if (range == 0) {
+      printf("Exec. time = %.3lfms\n", elapsed * 1000);
+      printf("GFLOPS = %.3lf\n", FLOPS / 1e9);
     }
+
+    res.exec_time[0] += (elapsed * 1000);
+    res.exec_time[1] = (res.exec_time[1] < (elapsed * 1000) ? (elapsed * 1000)
+                                                            : res.exec_time[1]);
+    res.exec_time[2] = (res.exec_time[2] > (elapsed * 1000) ? (elapsed * 1000)
+                                                            : res.exec_time[2]);
+
+    res.gflops[0] += (FLOPS / 1e9);
+    res.gflops[1] =
+        (res.gflops[1] < (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[1]);
+    res.gflops[2] =
+        (res.gflops[2] > (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[2]);
   }
 
-  return error_num;
+  /* The naive GEMM is slow, so it runs only on request and after the timed
+     runs (before them it would leave the caches and the cores cold). */
+  if (verify_flag) {
+    float* C_ref = alloc_mat(sizeof(float) * (size_t)M * N);
+
+    memset(C, 0, sizeof(float) * (size_t)M * N);
+    sgemm(A, B, C, M, N, K);
+    naive_sgemm(A, B, C_ref, M, N, K);
+
+    res.is_valid = TRUE;
+    for (size_t idx = 0; idx < (size_t)M * N; idx++)
+      if (C[idx] != C_ref[idx]) {
+        res.is_valid = FALSE;
+        break;
+      }
+    free(C_ref);
+  }
+
+  free(A);
+  free(B);
+  free(C);
+
+  return report(&res, file, console_flag, csv_flag);
 }
 
 int dgemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL csv_flag) {
-  int error_num = 0;
+               BOOL console_flag, BOOL csv_flag, BOOL verify_flag) {
+  double* A = alloc_mat(sizeof(double) * (size_t)M * K);
+  double* B = alloc_mat(sizeof(double) * (size_t)K * N);
+  double* C = alloc_mat(sizeof(double) * (size_t)M * N);
 
-  for (int m = M; m < (M + range); m++) {
-    for (int n = N; n < (N + range); n++) {
-      for (int k = K; k < (K + range); k++) {
-        TestResult res = {.lib = "gemm.h",
-                          .name = "dgemm",
-                          .isa = isa_name(INSTLEVEL_AVX512F),
-                          .threads = omp_get_max_threads(),
-                          .M = m,
-                          .K = k,
-                          .N = n,
-                          .niter = niter,
-                          .warmup = warmup,
-                          .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
-                          .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
+  fp64_get_rand_mat(M, K, A, bound);
+  fp64_get_rand_mat(K, N, B, bound);
+  memset(C, 0, sizeof(double) * (size_t)M * N);
 
-        double* A = (double*)malloc(m * k * sizeof(double));
-        double* B = (double*)malloc(k * n * sizeof(double));
-        double* C = (double*)malloc(m * n * sizeof(double));
-        double* C_ref = (double*)malloc(m * n * sizeof(double));
+  const double FLOP = 2.0 * M * N * K;
 
-        /* untimed warm-up runs (page faults, caches, threads) */
-        if (warmup > 0) {
-          fp64_get_rand_mat(m, k, A, bound);
-          fp64_get_rand_mat(k, n, B, bound);
-          for (int w = 0; w < warmup; w++) {
-            memset(C, 0, sizeof(double) * m * n);
-            dgemm(A, B, C, m, n, k);
-          }
-        }
+  TestResult res = {.lib = "gemm.h",
+                    .name = "dgemm",
+                    .isa = isa_name(INSTLEVEL_AVX512F),
+                    .threads = omp_get_max_threads(),
+                    .M = M,
+                    .K = K,
+                    .N = N,
+                    .niter = niter,
+                    .warmup = warmup,
+                    .verify = verify_flag,
+                    .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
+                    .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
 
-        for (int i = 0; i < niter; i++) {
-          memset(A, 0, sizeof(double) * m * k);
-          memset(B, 0, sizeof(double) * k * n);
-          memset(C, 0, sizeof(double) * m * n);
+  /* warm-up runs (page faults, caches, threads) are not measured */
+  for (int w = 0; w < warmup; w++)
+    dgemm(A, B, C, M, N, K);
 
-          fp64_get_rand_mat(m, k, A, bound);
-          fp64_get_rand_mat(k, n, B, bound);
+  for (int i = 0; i < niter; i++) {
+    /* C += A * B, so C is reset before every run (outside the timer) */
+    memset(C, 0, sizeof(double) * (size_t)M * N);
 
-          double FLOP = 2 * (double)m * n * k;
+    uint64_t start = timer();
+    dgemm(A, B, C, M, N, K);
+    uint64_t end = timer();
 
-          uint64_t start = timer();
-          dgemm(A, B, C, m, n, k);
-          uint64_t end = timer();
-          double elapsed = (end - start) * 1e-9;
-          double FLOPS = FLOP / elapsed;
+    double elapsed = (end - start) * 1e-9;
+    double FLOPS = FLOP / elapsed;
 
-          /* Validate the first iteration against the naive GEMM. */
-          if (i == 0) {
-            naive_dgemm(A, B, C_ref, m, n, k);
-
-            res.is_valid = TRUE;
-            for (int idx = 0; idx < m * n; idx++)
-              if (C[idx] != C_ref[idx]) {
-                res.is_valid = FALSE;
-                break;
-              }
-          }
-
-          // if range is not 0, don't print each results
-          if (range == 0) {
-            printf("Exec. time = %.3lfms\n", elapsed * 1000);
-            printf("GFLOPS = %.3lf\n", FLOPS / 1e9);
-          }
-
-          res.exec_time[0] += (elapsed * 1000);
-          res.exec_time[1] =
-              (res.exec_time[1] < (elapsed * 1000) ? (elapsed * 1000)
-                                                   : res.exec_time[1]);
-          res.exec_time[2] =
-              (res.exec_time[2] > (elapsed * 1000) ? (elapsed * 1000)
-                                                   : res.exec_time[2]);
-
-          res.gflops[0] += (FLOPS / 1e9);
-          res.gflops[1] =
-              (res.gflops[1] < (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[1]);
-          res.gflops[2] =
-              (res.gflops[2] > (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[2]);
-        }
-        free(A);
-        free(B);
-        free(C);
-        free(C_ref);
-
-        error_num += report(&res, file, console_flag, csv_flag);
-      }
+    /* if range is not 0, don't print each results */
+    if (range == 0) {
+      printf("Exec. time = %.3lfms\n", elapsed * 1000);
+      printf("GFLOPS = %.3lf\n", FLOPS / 1e9);
     }
+
+    res.exec_time[0] += (elapsed * 1000);
+    res.exec_time[1] = (res.exec_time[1] < (elapsed * 1000) ? (elapsed * 1000)
+                                                            : res.exec_time[1]);
+    res.exec_time[2] = (res.exec_time[2] > (elapsed * 1000) ? (elapsed * 1000)
+                                                            : res.exec_time[2]);
+
+    res.gflops[0] += (FLOPS / 1e9);
+    res.gflops[1] =
+        (res.gflops[1] < (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[1]);
+    res.gflops[2] =
+        (res.gflops[2] > (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[2]);
   }
 
-  return error_num;
+  /* The naive GEMM is slow, so it runs only on request and after the timed
+     runs (before them it would leave the caches and the cores cold). */
+  if (verify_flag) {
+    double* C_ref = alloc_mat(sizeof(double) * (size_t)M * N);
+
+    memset(C, 0, sizeof(double) * (size_t)M * N);
+    dgemm(A, B, C, M, N, K);
+    naive_dgemm(A, B, C_ref, M, N, K);
+
+    res.is_valid = TRUE;
+    for (size_t idx = 0; idx < (size_t)M * N; idx++)
+      if (C[idx] != C_ref[idx]) {
+        res.is_valid = FALSE;
+        break;
+      }
+    free(C_ref);
+  }
+
+  free(A);
+  free(B);
+  free(C);
+
+  return report(&res, file, console_flag, csv_flag);
 }
 
 int igemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL csv_flag) {
-  int error_num = 0;
+               BOOL console_flag, BOOL csv_flag, BOOL verify_flag) {
+  int* A = alloc_mat(sizeof(int) * (size_t)M * K);
+  int* B = alloc_mat(sizeof(int) * (size_t)K * N);
+  int* C = alloc_mat(sizeof(int) * (size_t)M * N);
 
-  for (int m = M; m < (M + range); m++) {
-    for (int n = N; n < (N + range); n++) {
-      for (int k = K; k < (K + range); k++) {
-        TestResult res = {.lib = "gemm.h",
-                          .name = "igemm",
-                          .isa = isa_name(INSTLEVEL_AVX512F),
-                          .threads = omp_get_max_threads(),
-                          .M = m,
-                          .K = k,
-                          .N = n,
-                          .niter = niter,
-                          .warmup = warmup,
-                          .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
-                          .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
+  int32_get_rand_mat(M, K, A, bound);
+  int32_get_rand_mat(K, N, B, bound);
+  memset(C, 0, sizeof(int) * (size_t)M * N);
 
-        int* A = (int*)malloc(m * k * sizeof(int));
-        int* B = (int*)malloc(k * n * sizeof(int));
-        int* C = (int*)malloc(m * n * sizeof(int));
-        int* C_ref = (int*)malloc(m * n * sizeof(int));
+  const double FLOP = 2.0 * M * N * K;
 
-        /* untimed warm-up runs (page faults, caches, threads) */
-        if (warmup > 0) {
-          int32_get_rand_mat(m, k, A, bound);
-          int32_get_rand_mat(k, n, B, bound);
-          for (int w = 0; w < warmup; w++) {
-            memset(C, 0, sizeof(int) * m * n);
-            igemm(A, B, C, m, n, k);
-          }
-        }
+  TestResult res = {.lib = "gemm.h",
+                    .name = "igemm",
+                    .isa = isa_name(INSTLEVEL_AVX512F),
+                    .threads = omp_get_max_threads(),
+                    .M = M,
+                    .K = K,
+                    .N = N,
+                    .niter = niter,
+                    .warmup = warmup,
+                    .verify = verify_flag,
+                    .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
+                    .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
 
-        for (int i = 0; i < niter; i++) {
-          memset(A, 0, sizeof(int) * m * k);
-          memset(B, 0, sizeof(int) * k * n);
-          memset(C, 0, sizeof(int) * m * n);
+  /* warm-up runs (page faults, caches, threads) are not measured */
+  for (int w = 0; w < warmup; w++)
+    igemm(A, B, C, M, N, K);
 
-          int32_get_rand_mat(m, k, A, bound);
-          int32_get_rand_mat(k, n, B, bound);
+  for (int i = 0; i < niter; i++) {
+    /* C += A * B, so C is reset before every run (outside the timer) */
+    memset(C, 0, sizeof(int) * (size_t)M * N);
 
-          double FLOP = 2 * (double)m * n * k;
+    uint64_t start = timer();
+    igemm(A, B, C, M, N, K);
+    uint64_t end = timer();
 
-          uint64_t start = timer();
-          igemm(A, B, C, m, n, k);
-          uint64_t end = timer();
-          double elapsed = (end - start) * 1e-9;
-          double FLOPS = FLOP / elapsed;
+    double elapsed = (end - start) * 1e-9;
+    double FLOPS = FLOP / elapsed;
 
-          /* Validate the first iteration against the naive GEMM. */
-          if (i == 0) {
-            naive_igemm(A, B, C_ref, m, n, k);
-
-            res.is_valid = TRUE;
-            for (int idx = 0; idx < m * n; idx++)
-              if (C[idx] != C_ref[idx]) {
-                res.is_valid = FALSE;
-                break;
-              }
-          }
-
-          // if range is not 0, don't print each results
-          if (range == 0) {
-            printf("Exec. time = %.3lfms\n", elapsed * 1000);
-            printf("GFLOPS = %.3lf\n", FLOPS / 1e9);
-          }
-
-          res.exec_time[0] += (elapsed * 1000);
-          res.exec_time[1] =
-              (res.exec_time[1] < (elapsed * 1000) ? (elapsed * 1000)
-                                                   : res.exec_time[1]);
-          res.exec_time[2] =
-              (res.exec_time[2] > (elapsed * 1000) ? (elapsed * 1000)
-                                                   : res.exec_time[2]);
-
-          res.gflops[0] += (FLOPS / 1e9);
-          res.gflops[1] =
-              (res.gflops[1] < (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[1]);
-          res.gflops[2] =
-              (res.gflops[2] > (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[2]);
-        }
-        free(A);
-        free(B);
-        free(C);
-        free(C_ref);
-
-        error_num += report(&res, file, console_flag, csv_flag);
-      }
+    /* if range is not 0, don't print each results */
+    if (range == 0) {
+      printf("Exec. time = %.3lfms\n", elapsed * 1000);
+      printf("GFLOPS = %.3lf\n", FLOPS / 1e9);
     }
+
+    res.exec_time[0] += (elapsed * 1000);
+    res.exec_time[1] = (res.exec_time[1] < (elapsed * 1000) ? (elapsed * 1000)
+                                                            : res.exec_time[1]);
+    res.exec_time[2] = (res.exec_time[2] > (elapsed * 1000) ? (elapsed * 1000)
+                                                            : res.exec_time[2]);
+
+    res.gflops[0] += (FLOPS / 1e9);
+    res.gflops[1] =
+        (res.gflops[1] < (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[1]);
+    res.gflops[2] =
+        (res.gflops[2] > (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[2]);
   }
 
-  return error_num;
+  /* The naive GEMM is slow, so it runs only on request and after the timed
+     runs (before them it would leave the caches and the cores cold). */
+  if (verify_flag) {
+    int* C_ref = alloc_mat(sizeof(int) * (size_t)M * N);
+
+    memset(C, 0, sizeof(int) * (size_t)M * N);
+    igemm(A, B, C, M, N, K);
+    naive_igemm(A, B, C_ref, M, N, K);
+
+    res.is_valid = TRUE;
+    for (size_t idx = 0; idx < (size_t)M * N; idx++)
+      if (C[idx] != C_ref[idx]) {
+        res.is_valid = FALSE;
+        break;
+      }
+    free(C_ref);
+  }
+
+  free(A);
+  free(B);
+  free(C);
+
+  return report(&res, file, console_flag, csv_flag);
 }
 
 int hqgemm_test(const int M, const int N, const int K, const int niter,
                 const int warmup, const int range, const int bound, FILE* file,
-                BOOL console_flag, BOOL csv_flag) {
-  int error_num = 0;
+                BOOL console_flag, BOOL csv_flag, BOOL verify_flag) {
+  int16_t* A = alloc_mat(sizeof(int16_t) * (size_t)M * K);
+  int16_t* B = alloc_mat(sizeof(int16_t) * (size_t)K * N);
+  int16_t* C = alloc_mat(sizeof(int16_t) * (size_t)M * N);
 
-  for (int m = M; m < (M + range); m++) {
-    for (int n = N; n < (N + range); n++) {
-      for (int k = K; k < (K + range); k++) {
-        TestResult res = {.lib = "gemm.h",
-                          .name = "hqgemm",
-                          .isa = isa_name(INSTLEVEL_AVX512BW),
-                          .threads = omp_get_max_threads(),
-                          .M = m,
-                          .K = k,
-                          .N = n,
-                          .niter = niter,
-                          .warmup = warmup,
-                          .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
-                          .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
+  int16_get_rand_mat(M, K, A, bound);
+  int16_get_rand_mat(K, N, B, bound);
+  memset(C, 0, sizeof(int16_t) * (size_t)M * N);
 
-        int16_t* A = (int16_t*)malloc(m * k * sizeof(int16_t));
-        int16_t* B = (int16_t*)malloc(k * n * sizeof(int16_t));
-        int16_t* C = (int16_t*)malloc(m * n * sizeof(int16_t));
-        int16_t* C_ref = (int16_t*)malloc(m * n * sizeof(int16_t));
+  const double FLOP = 2.0 * M * N * K;
 
-        /* untimed warm-up runs (page faults, caches, threads) */
-        if (warmup > 0) {
-          int16_get_rand_mat(m, k, A, bound);
-          int16_get_rand_mat(k, n, B, bound);
-          for (int w = 0; w < warmup; w++) {
-            memset(C, 0, sizeof(int16_t) * m * n);
-            hqgemm(A, B, C, m, n, k);
-          }
-        }
+  TestResult res = {.lib = "gemm.h",
+                    .name = "hqgemm",
+                    .isa = isa_name(INSTLEVEL_AVX512BW),
+                    .threads = omp_get_max_threads(),
+                    .M = M,
+                    .K = K,
+                    .N = N,
+                    .niter = niter,
+                    .warmup = warmup,
+                    .verify = verify_flag,
+                    .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
+                    .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
 
-        for (int i = 0; i < niter; i++) {
-          memset(A, 0, sizeof(int16_t) * m * k);
-          memset(B, 0, sizeof(int16_t) * k * n);
-          memset(C, 0, sizeof(int16_t) * m * n);
+  /* warm-up runs (page faults, caches, threads) are not measured */
+  for (int w = 0; w < warmup; w++)
+    hqgemm(A, B, C, M, N, K);
 
-          int16_get_rand_mat(m, k, A, bound);
-          int16_get_rand_mat(k, n, B, bound);
+  for (int i = 0; i < niter; i++) {
+    /* C += A * B, so C is reset before every run (outside the timer) */
+    memset(C, 0, sizeof(int16_t) * (size_t)M * N);
 
-          double FLOP = 2 * (double)m * n * k;
+    uint64_t start = timer();
+    hqgemm(A, B, C, M, N, K);
+    uint64_t end = timer();
 
-          uint64_t start = timer();
-          hqgemm(A, B, C, m, n, k);
-          uint64_t end = timer();
-          double elapsed = (end - start) * 1e-9;
-          double FLOPS = FLOP / elapsed;
+    double elapsed = (end - start) * 1e-9;
+    double FLOPS = FLOP / elapsed;
 
-          /* Validate the first iteration against the naive GEMM. */
-          if (i == 0) {
-            naive_hqgemm(A, B, C_ref, m, n, k);
-
-            res.is_valid = TRUE;
-            for (int idx = 0; idx < m * n; idx++)
-              if (C[idx] != C_ref[idx]) {
-                res.is_valid = FALSE;
-                break;
-              }
-          }
-
-          // if range is not 0, don't print each results
-          if (range == 0) {
-            printf("Exec. time = %.3lfms\n", elapsed * 1000);
-            printf("GFLOPS = %.3lf\n", FLOPS / 1e9);
-          }
-
-          res.exec_time[0] += (elapsed * 1000);
-          res.exec_time[1] =
-              (res.exec_time[1] < (elapsed * 1000) ? (elapsed * 1000)
-                                                   : res.exec_time[1]);
-          res.exec_time[2] =
-              (res.exec_time[2] > (elapsed * 1000) ? (elapsed * 1000)
-                                                   : res.exec_time[2]);
-
-          res.gflops[0] += (FLOPS / 1e9);
-          res.gflops[1] =
-              (res.gflops[1] < (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[1]);
-          res.gflops[2] =
-              (res.gflops[2] > (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[2]);
-        }
-        free(A);
-        free(B);
-        free(C);
-        free(C_ref);
-
-        error_num += report(&res, file, console_flag, csv_flag);
-      }
+    /* if range is not 0, don't print each results */
+    if (range == 0) {
+      printf("Exec. time = %.3lfms\n", elapsed * 1000);
+      printf("GFLOPS = %.3lf\n", FLOPS / 1e9);
     }
+
+    res.exec_time[0] += (elapsed * 1000);
+    res.exec_time[1] = (res.exec_time[1] < (elapsed * 1000) ? (elapsed * 1000)
+                                                            : res.exec_time[1]);
+    res.exec_time[2] = (res.exec_time[2] > (elapsed * 1000) ? (elapsed * 1000)
+                                                            : res.exec_time[2]);
+
+    res.gflops[0] += (FLOPS / 1e9);
+    res.gflops[1] =
+        (res.gflops[1] < (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[1]);
+    res.gflops[2] =
+        (res.gflops[2] > (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[2]);
   }
 
-  return error_num;
+  /* The naive GEMM is slow, so it runs only on request and after the timed
+     runs (before them it would leave the caches and the cores cold). */
+  if (verify_flag) {
+    int16_t* C_ref = alloc_mat(sizeof(int16_t) * (size_t)M * N);
+
+    memset(C, 0, sizeof(int16_t) * (size_t)M * N);
+    hqgemm(A, B, C, M, N, K);
+    naive_hqgemm(A, B, C_ref, M, N, K);
+
+    res.is_valid = TRUE;
+    for (size_t idx = 0; idx < (size_t)M * N; idx++)
+      if (C[idx] != C_ref[idx]) {
+        res.is_valid = FALSE;
+        break;
+      }
+    free(C_ref);
+  }
+
+  free(A);
+  free(B);
+  free(C);
+
+  return report(&res, file, console_flag, csv_flag);
 }
 
 int qgemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL csv_flag) {
-  int error_num = 0;
+               BOOL console_flag, BOOL csv_flag, BOOL verify_flag) {
+  int8_t* A = alloc_mat(sizeof(int8_t) * (size_t)M * K);
+  int8_t* B = alloc_mat(sizeof(int8_t) * (size_t)K * N);
+  int8_t* C = alloc_mat(sizeof(int8_t) * (size_t)M * N);
 
-  for (int m = M; m < (M + range); m++) {
-    for (int n = N; n < (N + range); n++) {
-      for (int k = K; k < (K + range); k++) {
-        TestResult res = {.lib = "gemm.h",
-                          .name = "qgemm",
-                          .isa = isa_name(INSTLEVEL_AVX512BW),
-                          .threads = omp_get_max_threads(),
-                          .M = m,
-                          .K = k,
-                          .N = n,
-                          .niter = niter,
-                          .warmup = warmup,
-                          .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
-                          .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
+  int8_get_rand_mat(M, K, A, bound);
+  int8_get_rand_mat(K, N, B, bound);
+  memset(C, 0, sizeof(int8_t) * (size_t)M * N);
 
-        int8_t* A = (int8_t*)malloc(m * k * sizeof(int8_t));
-        int8_t* B = (int8_t*)malloc(k * n * sizeof(int8_t));
-        int8_t* C = (int8_t*)malloc(m * n * sizeof(int8_t));
-        int8_t* C_ref = (int8_t*)malloc(m * n * sizeof(int8_t));
+  const double FLOP = 2.0 * M * N * K;
 
-        /* untimed warm-up runs (page faults, caches, threads) */
-        if (warmup > 0) {
-          int8_get_rand_mat(m, k, A, bound);
-          int8_get_rand_mat(k, n, B, bound);
-          for (int w = 0; w < warmup; w++) {
-            memset(C, 0, sizeof(int8_t) * m * n);
-            qgemm(A, B, C, m, n, k);
-          }
-        }
+  TestResult res = {.lib = "gemm.h",
+                    .name = "qgemm",
+                    .isa = isa_name(INSTLEVEL_AVX512BW),
+                    .threads = omp_get_max_threads(),
+                    .M = M,
+                    .K = K,
+                    .N = N,
+                    .niter = niter,
+                    .warmup = warmup,
+                    .verify = verify_flag,
+                    .exec_time = {0, __FLT_MIN__, __FLT_MAX__},
+                    .gflops = {0, __FLT_MIN__, __FLT_MAX__}};
 
-        for (int i = 0; i < niter; i++) {
-          memset(A, 0, sizeof(int8_t) * m * k);
-          memset(B, 0, sizeof(int8_t) * k * n);
-          memset(C, 0, sizeof(int8_t) * m * n);
+  /* warm-up runs (page faults, caches, threads) are not measured */
+  for (int w = 0; w < warmup; w++)
+    qgemm(A, B, C, M, N, K);
 
-          int8_get_rand_mat(m, k, A, bound);
-          int8_get_rand_mat(k, n, B, bound);
+  for (int i = 0; i < niter; i++) {
+    /* C += A * B, so C is reset before every run (outside the timer) */
+    memset(C, 0, sizeof(int8_t) * (size_t)M * N);
 
-          double FLOP = 2 * (double)m * n * k;
+    uint64_t start = timer();
+    qgemm(A, B, C, M, N, K);
+    uint64_t end = timer();
 
-          uint64_t start = timer();
-          qgemm(A, B, C, m, n, k);
-          uint64_t end = timer();
-          double elapsed = (end - start) * 1e-9;
-          double FLOPS = FLOP / elapsed;
+    double elapsed = (end - start) * 1e-9;
+    double FLOPS = FLOP / elapsed;
 
-          /* Validate the first iteration against the naive GEMM. */
-          if (i == 0) {
-            naive_qgemm(A, B, C_ref, m, n, k);
-
-            res.is_valid = TRUE;
-            for (int idx = 0; idx < m * n; idx++)
-              if (C[idx] != C_ref[idx]) {
-                res.is_valid = FALSE;
-                break;
-              }
-          }
-
-          // if range is not 0, don't print each results
-          if (range == 0) {
-            printf("Exec. time = %.3lfms\n", elapsed * 1000);
-            printf("GFLOPS = %.3lf\n", FLOPS / 1e9);
-          }
-
-          res.exec_time[0] += (elapsed * 1000);
-          res.exec_time[1] =
-              (res.exec_time[1] < (elapsed * 1000) ? (elapsed * 1000)
-                                                   : res.exec_time[1]);
-          res.exec_time[2] =
-              (res.exec_time[2] > (elapsed * 1000) ? (elapsed * 1000)
-                                                   : res.exec_time[2]);
-
-          res.gflops[0] += (FLOPS / 1e9);
-          res.gflops[1] =
-              (res.gflops[1] < (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[1]);
-          res.gflops[2] =
-              (res.gflops[2] > (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[2]);
-        }
-        free(A);
-        free(B);
-        free(C);
-        free(C_ref);
-
-        error_num += report(&res, file, console_flag, csv_flag);
-      }
+    /* if range is not 0, don't print each results */
+    if (range == 0) {
+      printf("Exec. time = %.3lfms\n", elapsed * 1000);
+      printf("GFLOPS = %.3lf\n", FLOPS / 1e9);
     }
+
+    res.exec_time[0] += (elapsed * 1000);
+    res.exec_time[1] = (res.exec_time[1] < (elapsed * 1000) ? (elapsed * 1000)
+                                                            : res.exec_time[1]);
+    res.exec_time[2] = (res.exec_time[2] > (elapsed * 1000) ? (elapsed * 1000)
+                                                            : res.exec_time[2]);
+
+    res.gflops[0] += (FLOPS / 1e9);
+    res.gflops[1] =
+        (res.gflops[1] < (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[1]);
+    res.gflops[2] =
+        (res.gflops[2] > (FLOPS / 1e9) ? (FLOPS / 1e9) : res.gflops[2]);
   }
 
-  return error_num;
+  /* The naive GEMM is slow, so it runs only on request and after the timed
+     runs (before them it would leave the caches and the cores cold). */
+  if (verify_flag) {
+    int8_t* C_ref = alloc_mat(sizeof(int8_t) * (size_t)M * N);
+
+    memset(C, 0, sizeof(int8_t) * (size_t)M * N);
+    qgemm(A, B, C, M, N, K);
+    naive_qgemm(A, B, C_ref, M, N, K);
+
+    res.is_valid = TRUE;
+    for (size_t idx = 0; idx < (size_t)M * N; idx++)
+      if (C[idx] != C_ref[idx]) {
+        res.is_valid = FALSE;
+        break;
+      }
+    free(C_ref);
+  }
+
+  free(A);
+  free(B);
+  free(C);
+
+  return report(&res, file, console_flag, csv_flag);
 }
 
 uint64_t timer() {

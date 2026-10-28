@@ -8,19 +8,19 @@
 
 int sgemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL csv_flag);
+               BOOL console_flag, BOOL csv_flag, BOOL verify_flag);
 int dgemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL csv_flag);
+               BOOL console_flag, BOOL csv_flag, BOOL verify_flag);
 int igemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL csv_flag);
+               BOOL console_flag, BOOL csv_flag, BOOL verify_flag);
 int hqgemm_test(const int M, const int N, const int K, const int niter,
                 const int warmup, const int range, const int bound, FILE* file,
-                BOOL console_flag, BOOL csv_flag);
+                BOOL console_flag, BOOL csv_flag, BOOL verify_flag);
 int qgemm_test(const int M, const int N, const int K, const int niter,
                const int warmup, const int range, const int bound, FILE* file,
-               BOOL console_flag, BOOL csv_flag);
+               BOOL console_flag, BOOL csv_flag, BOOL verify_flag);
 
 uint64_t timer();
 
