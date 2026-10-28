@@ -53,7 +53,6 @@ void get_cache_size(size_t* cache_size) {
 
 void set_block_size(size_t* cache_size, const int NTHREADS, const int MR,
                     const int NR, int* MC, int* KC, int* NC, D_TYPE d_type) {
-  float MC_f = (*MC), NC_f = (*NC);
   int d_size = 0;
   if (d_type == D_FP32)
     d_size = sizeof(float);
@@ -66,18 +65,17 @@ void set_block_size(size_t* cache_size, const int NTHREADS, const int MR,
   else if (d_type == D_INT8)
     d_size = sizeof(int8_t);
 
-  if (cache_size[1] != 0) {
-    (*KC) = cache_size[1] / (NR * d_size);  // L1 = KC * NR
+  if (cache_size[2] != 0) {
+    *KC = cache_size[2] / 4 / (NR * d_size);
   }
   if (cache_size[2] != 0) {
-    MC_f = cache_size[2] / ((*KC) * d_size);  // L2 = MC * KC
-    MC_f /= (MR * NTHREADS);
-    (*MC) = round(MC_f) * MR * NTHREADS;
+    int mc = (cache_size[2] / 2) / ((*KC) * d_size);
+    *MC = (mc / MR) * MR;
   }
+
   if (cache_size[3] != 0) {
-    NC_f = cache_size[3] / ((*MC) * d_size);  // L3 = NC * KC
-    NC_f /= (NR * NTHREADS);
-    (*NC) = round(NC_f) * NR * NTHREADS;
+    int nc = (cache_size[3] / 2) / ((*MC) * d_size);
+    *NC = (nc / NR) * NR;
   }
 
 #if DEBUG
@@ -90,7 +88,7 @@ void set_block_size(size_t* cache_size, const int NTHREADS, const int MR,
 void cache_opt(const int NTHREADS, const int MR, const int NR, int* MC, int* KC,
                int* NC, D_TYPE d_type) {
   static size_t
-      cache_size[32];  // CPUID 결과는 프로그램 전체에서 한 번만 읽는다
+      cache_size[32];
   static int cache_ready = 0;
   if (!cache_ready) {
     get_cache_size(cache_size);
@@ -98,7 +96,7 @@ void cache_opt(const int NTHREADS, const int MR, const int NR, int* MC, int* KC,
   }
 
   /* default value */
-  *KC = 256;
+  *KC = 768;
   *MC = MR * NTHREADS;
   *NC = NR * NTHREADS;
 
